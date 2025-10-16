@@ -1,0 +1,39 @@
+pip install transformers datasets rouge_score --quiet
+from datasets import load_dataset
+dataset=load_dataset('cnn_dailymail', '3.0.0', split='train')
+from transformers import pipeline
+from datasets import load_dataset
+from rouge_score import rouge_scorer
+import numpy as np
+summarizer=pipeline('summarization', model='facebook/bart-large-cnn')
+dataset=load_dataset('cnn_dailymail', '3.0.0', split='test[:5]')
+
+summaries=[]
+for article in dataset:
+    text=article['article']
+    summary=summarizer(text, max_length=130, min_length=30, do_sample=False, truncation=True)[0]['summary_text']
+    summaries.append({
+        'reference': article['highlights'],
+        'generated': summary
+    })
+
+from rouge_score import rouge_scorer
+scorer=rouge_scorer.RougeScorer(['rouge1', 'rouge2', 'rougeL'], use_stemmer=True)
+rouge1_scores=[]
+rouge2_scores=[]
+rougeL_scores=[]
+
+for s in summaries:
+    scores=scorer.score(s['reference'], s['generated'])
+    rouge1_scores.append(scores['rouge1'].fmeasure)
+    rouge2_scores.append(scores['rouge2'].fmeasure)
+    rougeL_scores.append(scores['rougeL'].fmeasure)
+
+print('ROUGE-1:', np.mean(rouge1_scores))
+print('ROUGE-2:', np.mean(rouge2_scores))
+print('ROUGE-L:', np.mean(rougeL_scores))
+
+for i, summary in enumerate(summaries):
+    print(f'\nArticle{i+1}')
+    print('Reference:', summary['reference'])
+    print('Generated:', summary['generated'])
